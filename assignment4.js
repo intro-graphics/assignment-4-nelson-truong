@@ -15,6 +15,12 @@ export class Assignment4 extends Scene {
         // constructor(): Scenes begin by populating initial values like the Shapes and Materials they'll need.
         super();
 
+        // Store current angle
+        this.angle = 0;
+
+        // Rotation flag
+        this.rotate_flag = false;
+
         // TODO:  Create two cubes, including one with the default texture coordinates (from 0 to 1), and one with the modified
         //        texture coordinates as required for cube #2.  You can either do this by modifying the cube code or by modifying
         //        a cube instance's texture_coords after it is already created.
@@ -24,6 +30,10 @@ export class Assignment4 extends Scene {
             axis: new Axis_Arrows()
         }
         console.log(this.shapes.box_1.arrays.texture_coord)
+
+        this.shapes.box_2.arrays.texture_coord.forEach(
+            (v, i, l) => l[i] = vec(v[0] * 2, v[1] * 2)
+        );
 
 
         // TODO:  Create the materials required to texture both cubes with the correct images and settings.
@@ -38,6 +48,16 @@ export class Assignment4 extends Scene {
                 ambient: 0.5, diffusivity: 0.1, specularity: 0.1,
                 texture: new Texture("assets/stars.png")
             }),
+            load1: new Material(new Texture_Rotate(), {
+                color: hex_color("#000000"),
+                ambient: 0.9, diffusivity: 0.1, specularity: 0.1,
+                texture: new Texture("assets/toucan.jpg", "NEAREST")
+            }),
+            load2: new Material(new Texture_Scroll_X(), {
+                color: hex_color("#000000"),
+                ambient: 0.9, diffusivity: 0.1, specularity: 0.1,
+                texture: new Texture("assets/penguin.jpg", "LINEAR_MIPMAP_LINEAR")
+            }),
         }
 
         this.initial_camera_location = Mat4.look_at(vec3(0, 10, 20), vec3(0, 0, 0), vec3(0, 1, 0));
@@ -45,6 +65,9 @@ export class Assignment4 extends Scene {
 
     make_control_panel() {
         // TODO:  Implement requirement #5 using a key_triggered_button that responds to the 'c' key.
+        this.key_triggered_button("Rotate", ["c"], () => {
+            this.rotate_flag = !this.rotate_flag;
+        });
     }
 
     display(context, program_state) {
@@ -65,7 +88,18 @@ export class Assignment4 extends Scene {
 
         // TODO:  Draw the required boxes. Also update their stored matrices.
         // You can remove the folloeing line.
-        this.shapes.axis.draw(context, program_state, model_transform, this.materials.phong.override({color: hex_color("#ffff00")}));
+
+        let box_1_transform = Mat4.translation(-2, 0, 0)
+                                  .times(Mat4.rotation(this.angle, 1, 0, 0));
+        let box_2_transform = Mat4.translation(2, 0, 0)
+                                  .times(Mat4.rotation(this.angle * 3 / 2, 0, 1, 0));
+        
+        if (this.rotate_flag) {
+            this.angle = this.angle + dt;
+        }
+
+        this.shapes.box_1.draw(context, program_state, box_1_transform, this.materials.load1);
+        this.shapes.box_2.draw(context, program_state, box_2_transform, this.materials.load2);
     }
 }
 
@@ -80,7 +114,8 @@ class Texture_Scroll_X extends Textured_Phong {
             
             void main(){
                 // Sample the texture image in the correct place:
-                vec4 tex_color = texture2D( texture, f_tex_coord);
+                float scroll = (2.0 * animation_time) - (60.0 * floor(2.0 * animation_time / 60.0));
+                vec4 tex_color = texture2D( texture, vec2(f_tex_coord.x - scroll, f_tex_coord.y));
                 if( tex_color.w < .01 ) discard;
                                                                          // Compute an initial (ambient) color:
                 gl_FragColor = vec4( ( tex_color.xyz + shape_color.xyz ) * ambient, shape_color.w * tex_color.w ); 
@@ -99,8 +134,24 @@ class Texture_Rotate extends Textured_Phong {
             uniform sampler2D texture;
             uniform float animation_time;
             void main(){
+                
+                float PI = 3.14159;
+
+                float angle = animation_time - (4.0 * floor(animation_time / 4.0));
+                
+                // float angle = animation_time * (3.0/2.0);
+
+                mat2 rotation = mat2(cos(-angle * (PI/2.0)), -sin(-angle * (PI/2.0)), 
+                                     sin(-angle * (PI/2.0)), cos(-angle * (PI/2.0)));
+
+                mat2 rotation_45 = mat2(cos(PI * 0.25), -sin(PI * 0.25), 
+                                     sin(PI * 0.25), cos(PI * 0.25));
+
+                
+                vec2 center = vec2(0.5, 0.5);
+
                 // Sample the texture image in the correct place:
-                vec4 tex_color = texture2D( texture, f_tex_coord );
+                vec4 tex_color = texture2D( texture, (f_tex_coord - center) * rotation + center );
                 if( tex_color.w < .01 ) discard;
                                                                          // Compute an initial (ambient) color:
                 gl_FragColor = vec4( ( tex_color.xyz + shape_color.xyz ) * ambient, shape_color.w * tex_color.w ); 
